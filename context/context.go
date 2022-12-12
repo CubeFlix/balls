@@ -3,7 +3,8 @@
 
 package context
 
+import "time"
+
 type DrawContext interface {
-	PreDraw()
-	PostDraw()
+	PreDraw(time.Duration)
 }

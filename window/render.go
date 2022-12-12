@@ -28,21 +28,23 @@ func (r *RenderPipeline) RegisterObject(o *Object) {
 
 // Object.
 type Object struct {
-	points []float32
-	vao    uint32
-	x      float32
-	y      float32
-	spName string
-	window *Window
+	points           []float32
+	vao              uint32
+	x                float32
+	y                float32
+	spName           string
+	window           *Window
+	shaderAttributes map[*uint8]float32
 }
 
 // New object.
 func NewObject(points []float32, spName string, w *Window) *Object {
 	// Return the new object.
 	return &Object{
-		points: points,
-		spName: spName,
-		window: w,
+		points:           points,
+		spName:           spName,
+		window:           w,
+		shaderAttributes: map[*uint8]float32{},
 	}
 }
 
@@ -55,6 +57,12 @@ func (o *Object) Move(x, y float32) {
 // Get the position of the object.
 func (o *Object) Pos() (float32, float32) {
 	return o.x, o.y
+}
+
+// Set a shader attribute.
+func (o *Object) SetShaderAttribute(name string, value float32) {
+	nameString := gl.Str(name + "\x00")
+	o.shaderAttributes[nameString] = value
 }
 
 // Generate a VBO from the object.
@@ -85,6 +93,12 @@ func (o *Object) Render() {
 	// Get the location of the vertex shader position uniform param.
 	loc := gl.GetUniformLocation(shaderProg, shader.positionString)
 	gl.Uniform3f(loc, o.x, o.y, 1)
+
+	// Set the shader attributes.
+	for attribute := range o.shaderAttributes {
+		loc := gl.GetUniformLocation(shaderProg, attribute)
+		gl.Uniform1f(loc, o.shaderAttributes[attribute])
+	}
 
 	gl.BindVertexArray(o.vao)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(o.points)/3))

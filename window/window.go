@@ -7,6 +7,7 @@ import (
 	"balls/context"
 	"log"
 	"runtime"
+	"time"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -88,32 +89,40 @@ func (w *Window) Start() {
 	}
 
 	// Main loop.
+	elapsedTime := time.Duration(0)
+	lastTime := time.Now()
+	currentTime := lastTime
 	for !w.window.ShouldClose() {
-		w.DrawContext.PreDraw()
+		w.DrawContext.PreDraw(elapsedTime)
+
+		// Load new objects.
+		shouldContinueChecking := true
+		for shouldContinueChecking {
+			select {
+			case obj := <-w.renderPipeline.newObjects:
+				// New object, generate the VAO and add it to the render pipeline's objects.
+				obj.GenerateVAO()
+				w.renderPipeline.objects = append(w.renderPipeline.objects, obj)
+			default:
+				// No new objects this cycle, continue.
+				shouldContinueChecking = false
+			}
+		}
+
 		w.draw()
-		w.DrawContext.PostDraw()
+
+		currentTime = time.Now()
+		elapsedTime = currentTime.Sub(lastTime)
+		lastTime = currentTime
 	}
 
 	// Terminate the window.
+	gl.Finish()
 	glfw.Terminate()
 }
 
 // Draw function.
 func (w *Window) draw() {
-	// Load new objects.
-	shouldContinueChecking := true
-	for shouldContinueChecking {
-		select {
-		case obj := <-w.renderPipeline.newObjects:
-			// New object, generate the VAO and add it to the render pipeline's objects.
-			obj.GenerateVAO()
-			w.renderPipeline.objects = append(w.renderPipeline.objects, obj)
-		default:
-			// No new objects this cycle, continue.
-			shouldContinueChecking = false
-		}
-	}
-
 	// Prepare the window.
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
@@ -122,9 +131,8 @@ func (w *Window) draw() {
 		w.renderPipeline.objects[i].Render()
 	}
 
-	// Handle events and draw.
-	glfw.PollEvents()
 	w.window.SwapBuffers()
+	glfw.PollEvents()
 }
 
 // Register a new object.
